@@ -139,7 +139,7 @@ router.get('/verify-token', async (req, res) => {
       .input('username', decoded.username)
       .query('SELECT * FROM userlog WHERE id = @username');
 
-      console.log(result)
+      //console.log(result)
     if (result.recordset.length === 0) {
       return res.status(401).json({ success: false, message: 'User no longer exists' });
     }
