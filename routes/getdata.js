@@ -6,6 +6,7 @@ const Enquiry = require('../models/RoomEnquiry')
 const fetchuser = require('../middleware/fetchuser');
 const connectToMainDB = require('../db');
 const connectToDynamicDB = require('../DynaimicDB');
+const dynamicDbMiddleware = require('../middleware/dynamicDbMiddleware');
 
 router.get("/employee", async (req, res) => {
     try {
@@ -52,9 +53,10 @@ router.get("/employee", async (req, res) => {
 });
 
 
-router.get("/ledger", async (req, res) => {
+router.get("/ledger", dynamicDbMiddleware, async (req, res) => {
     try {
-        const pool = await connectToDynamicDB;
+
+        const pool = req.dbPool;
 
         const page = parseInt(req.query.page) || 1;
         const pageSize = 50;

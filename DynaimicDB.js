@@ -1,33 +1,31 @@
+// db/connectToDynamicDB.js
 const sql = require('mssql');
 
-//sqlcmd -S 122.176.35.15 -U shri -P '123'
-const config = {
-  server: '122.176.35.15',
-  user: 'shri',
-  password: '123',
-  database: 'shri1',
+async function connectToDynamicDB({ server, user, password, database }) {
+  const config = {
+    server,
+    user,
+    password,
+    database,
     pool: {
-        max: 20,         // Maximum number of connections in the pool
-        min: 0,          // Minimum number of connections in the pool
-        idleTimeoutMillis: 30000, // Idle timeout for unused connections
+      max: 20,
+      min: 0,
+      idleTimeoutMillis: 30000,
     },
     options: {
-        encrypt: false,              // Disable encryption for older SQL Server versions
-        trustServerCertificate: true // Use this for self-signed certificates
+      encrypt: false,
+      trustServerCertificate: true,
     },
-};
+  };
 
-
-// Establish a connection pool
-const connectToDynamicDB = new sql.ConnectionPool(config)
-    .connect()
-    .then((pool) => {
-        console.log("Connected to SQL Server 2");
-        return pool;
-    })
-    .catch((err) => {
-        console.error("Database Connection Failed! Bad Config: ", err);
-        throw err;
-    });
+  try {
+    const pool = await sql.connect(config);
+    console.log(`Connected to SQL Server: ${server} / DB: ${database}`);
+    return pool;
+  } catch (err) {
+    console.error("Database Connection Failed:", err.message);
+    return null;
+  }
+}
 
 module.exports = connectToDynamicDB;

@@ -146,14 +146,11 @@ router.get('/verify-token', async (req, res) => {
 
     const user = result.recordset[0];
 
-    return res.json({
+     return res.json({
       success: true,
       message: 'Token is valid',
-      user: {
-        username: user.id,
-        userId: user.user_id || user.id, // adjust as per schema
-        dbInfo: user
-      }
+      token,
+      userDbInfo: user,
     });
   } catch (err) {
     return res.status(401).json({ success: false, message: 'Invalid or expired token' });
