@@ -3,6 +3,7 @@ const connectToDynamicDB = require("../DynaimicDB");
 // middleware/dynamicDbMiddleware.js
 const dynamicDbMiddleware = async (req, res, next) => {
   const { server, user, password, database } = req.headers;
+  //console.log(server, user, password, database);
 
   if (!server || !user || !password || !database) {
     return res.status(400).json({ error: "Missing database connection details in headers" });

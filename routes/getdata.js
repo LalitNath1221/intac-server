@@ -56,7 +56,7 @@ router.get("/employee", async (req, res) => {
 router.get("/ledger", dynamicDbMiddleware, async (req, res) => {
     try {
 
-        const pool = req.dbPool;
+        const pool = req.db;
 
         const page = parseInt(req.query.page) || 1;
         const pageSize = 50;
@@ -123,7 +123,7 @@ router.get("/ledger", dynamicDbMiddleware, async (req, res) => {
         });
 
     } catch (err) {
-        console.error("Error fetching ledger data:", err.message);
+        console.error("Error fetching ledger data:", err);
         res.status(500).send("Internal server error");
     }
 });
