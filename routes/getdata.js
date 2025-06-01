@@ -55,7 +55,6 @@ router.get("/employee", async (req, res) => {
 
 router.get("/ledger", dynamicDbMiddleware, async (req, res) => {
     try {
-
         const pool = req.db;
 
         const page = parseInt(req.query.page) || 1;
@@ -66,17 +65,17 @@ router.get("/ledger", dynamicDbMiddleware, async (req, res) => {
         const fromDate = req.query.fromDate;
         const toDate = req.query.toDate;
 
-        let whereClauses = [];
+        if (!accid) {
+            return res.status(400).json({ error: "accid is required" });
+        }
+
+        let whereClauses = ["accid = @accid"];
         let request = pool.request();
 
+        request.input("accid", sql.VarChar, accid);
         request.input("offset", sql.Int, offset);
         request.input("pageSize", sql.Int, pageSize);
 
-        // Add filters if provided
-        if (accid) {
-            whereClauses.push("accid = @accid");
-            request.input("accid", sql.VarChar, accid);
-        }
         if (fromDate && toDate) {
             whereClauses.push("trndate BETWEEN @fromDate AND @toDate");
             request.input("fromDate", sql.Date, fromDate);
@@ -85,7 +84,24 @@ router.get("/ledger", dynamicDbMiddleware, async (req, res) => {
 
         const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
 
-        // Query ledger data (without JOIN)
+        // Opening balance: sum of debit - credit before fromDate
+        let openingBalance = 0;
+        if (fromDate) {
+            const openingRequest = pool.request();
+            openingRequest.input("accid", sql.VarChar, accid);
+            openingRequest.input("fromDate", sql.Date, fromDate);
+
+            const openingResult = await openingRequest.query(`
+                SELECT ISNULL(SUM(damount), 0) AS totalDebit, ISNULL(SUM(camount), 0) AS totalCredit
+                FROM ldgr
+                WHERE accid = @accid AND trndate < @fromDate
+            `);
+
+            const { totalDebit, totalCredit } = openingResult.recordset[0];
+            openingBalance = parseFloat(totalDebit) - parseFloat(totalCredit);
+        }
+
+        // Fetch paginated transactions in date range
         const dataQuery = `
             SELECT * 
             FROM ldgr
@@ -104,7 +120,20 @@ router.get("/ledger", dynamicDbMiddleware, async (req, res) => {
         const countResult = await request.query(countQuery);
         const totalCount = countResult.recordset[0].totalCount;
 
-        // Fetch distinct accid and account names (with JOIN here only)
+        // Calculate closing balance per entry
+        let runningBalance = openingBalance;
+        const processedData = result.recordset.map(entry => {
+            const debit = parseFloat(entry.damount || 0);
+            const credit = parseFloat(entry.camount || 0);
+            runningBalance += debit - credit;
+
+            return {
+                ...entry,
+                closingBalance: runningBalance
+            };
+        });
+
+        // Fetch list of accounts
         const accountList = await pool.request().query(`
             SELECT DISTINCT l.accid, a.ACNAME 
             FROM ldgr l 
@@ -118,7 +147,35 @@ router.get("/ledger", dynamicDbMiddleware, async (req, res) => {
             pageSize,
             totalRecords: totalCount,
             totalPages: Math.ceil(totalCount / pageSize),
-            data: result.recordset,
+            openingBalance,
+            data: processedData,
+            accounts: accountList.recordset
+        });
+
+    } catch (err) {
+        console.error("Error fetching ledger data:", err);
+        res.status(500).send("Internal server error");
+    }
+});
+
+
+router.get("/accounts", dynamicDbMiddleware, async (req, res) => {
+    try {
+
+        const pool = req.db;
+        let request = pool.request();
+
+
+        // Fetch distinct accid and account names (with JOIN here only)
+        const accountList = await pool.request().query(`
+            SELECT DISTINCT l.accid, a.ACNAME 
+            FROM ldgr l 
+            JOIN ACCMST a ON l.accid = a.accid 
+            ORDER BY a.ACNAME
+        `);
+
+        res.json({
+            listName: "List of Accounts",
             accounts: accountList.recordset
         });
 
