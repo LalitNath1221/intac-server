@@ -106,7 +106,7 @@ router.get("/ledger", dynamicDbMiddleware, async (req, res) => {
             SELECT * 
             FROM ldgr
             ${whereSQL}
-            ORDER BY trndate DESC
+            ORDER BY trndate ASC
             OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY
         `;
 
