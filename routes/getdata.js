@@ -54,8 +54,9 @@ router.get("/employee", async (req, res) => {
 
 
 router.get("/ledger", dynamicDbMiddleware, async (req, res) => {
+    const pool = req.db;
+
     try {
-        const pool = req.db;
 
         const page = parseInt(req.query.page) || 1;
         const pageSize = 50;
@@ -155,14 +156,17 @@ router.get("/ledger", dynamicDbMiddleware, async (req, res) => {
     } catch (err) {
         console.error("Error fetching ledger data:", err);
         res.status(500).send("Internal server error");
+    } finally {
+        await pool.close();
     }
 });
 
 
 router.get("/accounts", dynamicDbMiddleware, async (req, res) => {
+    const pool = req.db;
     try {
 
-        const pool = req.db;
+
         let request = pool.request();
 
 
@@ -173,7 +177,7 @@ router.get("/accounts", dynamicDbMiddleware, async (req, res) => {
             JOIN ACCMST a ON l.accid = a.accid 
             ORDER BY a.ACNAME
         `);
-
+        //console.log(accountList.recordset)
         res.json({
             listName: "List of Accounts",
             accounts: accountList.recordset
@@ -182,6 +186,8 @@ router.get("/accounts", dynamicDbMiddleware, async (req, res) => {
     } catch (err) {
         console.error("Error fetching ledger data:", err);
         res.status(500).send("Internal server error");
+    } finally {
+        await pool.close();
     }
 });
 

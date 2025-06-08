@@ -19,9 +19,10 @@ async function connectToDynamicDB({ server, user, password, database }) {
   };
 
   try {
-    const pool = await sql.connect(config);
+    const pool = new sql.ConnectionPool(config);
+    const connectedPool = await pool.connect();
     console.log(`Connected to SQL Server: ${server} / DB: ${database}`);
-    return pool;
+    return connectedPool;
   } catch (err) {
     console.error("Database Connection Failed:", err.message);
     return null;
