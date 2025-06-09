@@ -81,6 +81,12 @@ router.get("/ledger", dynamicDbMiddleware, async (req, res) => {
             whereClauses.push("trndate BETWEEN @fromDate AND @toDate");
             request.input("fromDate", sql.Date, fromDate);
             request.input("toDate", sql.Date, toDate);
+        } else if (fromDate) {
+            whereClauses.push("trndate >= @fromDate");
+            request.input("fromDate", sql.Date, fromDate);
+        } else if (toDate) {
+            whereClauses.push("trndate <= @toDate");
+            request.input("toDate", sql.Date, toDate);
         }
 
         const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
@@ -100,6 +106,8 @@ router.get("/ledger", dynamicDbMiddleware, async (req, res) => {
 
             const { totalDebit, totalCredit } = openingResult.recordset[0];
             openingBalance = parseFloat(totalDebit) - parseFloat(totalCredit);
+        } else {
+            openingBalance = 0;
         }
 
         // Fetch paginated transactions in date range
