@@ -169,6 +169,87 @@ router.get("/ledger", dynamicDbMiddleware, async (req, res) => {
     }
 });
 
+router.get("/ledger/export", dynamicDbMiddleware, async (req, res) => {
+    const pool = req.db;
+
+    try {
+        const accid = req.query.accid;
+        const fromDate = req.query.fromDate;
+        const toDate = req.query.toDate;
+
+        if (!accid) {
+            return res.status(400).json({ error: "accid is required" });
+        }
+
+        let whereClauses = ["accid = @accid"];
+        let request = pool.request();
+        request.input("accid", sql.VarChar, accid);
+
+        if (fromDate && toDate) {
+            whereClauses.push("trndate BETWEEN @fromDate AND @toDate");
+            request.input("fromDate", sql.Date, fromDate);
+            request.input("toDate", sql.Date, toDate);
+        } else if (fromDate) {
+            whereClauses.push("trndate >= @fromDate");
+            request.input("fromDate", sql.Date, fromDate);
+        } else if (toDate) {
+            whereClauses.push("trndate <= @toDate");
+            request.input("toDate", sql.Date, toDate);
+        }
+
+        const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
+
+        // Opening balance calculation same as before
+        let openingBalance = 0;
+        if (fromDate) {
+            const openingRequest = pool.request();
+            openingRequest.input("accid", sql.VarChar, accid);
+            openingRequest.input("fromDate", sql.Date, fromDate);
+
+            const openingResult = await openingRequest.query(`
+                SELECT ISNULL(SUM(damount), 0) AS totalDebit, ISNULL(SUM(camount), 0) AS totalCredit
+                FROM ldgr
+                WHERE accid = @accid AND trndate < @fromDate
+            `);
+
+            const { totalDebit, totalCredit } = openingResult.recordset[0];
+            openingBalance = parseFloat(totalDebit) - parseFloat(totalCredit);
+        }
+
+        const dataQuery = `
+            SELECT * 
+            FROM ldgr
+            ${whereSQL}
+            ORDER BY trndate ASC
+        `;
+
+        const result = await request.query(dataQuery);
+
+        let runningBalance = openingBalance;
+        const processedData = result.recordset.map(entry => {
+            const debit = parseFloat(entry.damount || 0);
+            const credit = parseFloat(entry.camount || 0);
+            runningBalance += debit - credit;
+
+            return {
+                ...entry,
+                closingBalance: runningBalance
+            };
+        });
+
+        res.json({
+            openingBalance,
+            data: processedData
+        });
+
+    } catch (err) {
+        console.error("Error exporting ledger data:", err);
+        res.status(500).send("Internal server error");
+    } finally {
+        await pool.close();
+    }
+});
+
 
 router.get("/accounts", dynamicDbMiddleware, async (req, res) => {
     const pool = req.db;
